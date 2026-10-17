@@ -97,6 +97,7 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
             "outtmpl": out_template,
             "ffmpeg_location": ffmpeg_location,
             "extractor_args": common_extractor_args,
+            "cookiefile": "/etc/secrets/cookies.txt",
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
@@ -110,6 +111,7 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
             "outtmpl": out_template,
             "ffmpeg_location": ffmpeg_location,
             "extractor_args": common_extractor_args,
+            "cookiefile": "/etc/secrets/cookies.txt",
             "quiet": False,
         }
 
