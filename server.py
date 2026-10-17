@@ -9,7 +9,6 @@ import yt_dlp
 
 app = FastAPI(title="Local Media Downloader API")
 
-# Habilitar CORS para permitir peticiones desde la extensión de Chrome
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,16 +23,17 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 SECRET_COOKIES_PATH = "/etc/secrets/cookies.txt"
 WRITABLE_COOKIES_PATH = os.path.join(DOWNLOAD_DIR, "cookies_working.txt")
 
+
 def get_writable_cookies() -> str | None:
     """Copia el archivo de cookies de solo lectura a una ruta escribible."""
     if os.path.exists(SECRET_COOKIES_PATH):
         shutil.copyfile(SECRET_COOKIES_PATH, WRITABLE_COOKIES_PATH)
         return WRITABLE_COOKIES_PATH
-    # Si estás en local y tienes un cookies.txt en la misma carpeta:
     if os.path.exists("cookies.txt"):
         shutil.copyfile("cookies.txt", WRITABLE_COOKIES_PATH)
         return WRITABLE_COOKIES_PATH
     return None
+
 
 def get_ffmpeg_location() -> str:
     """Return the directory containing ffmpeg and ffprobe."""
@@ -79,12 +79,14 @@ def get_ffmpeg_location() -> str:
 
 class DownloadRequest(BaseModel):
     url: str
-    format: str = "mp3"  # "mp3" o "mp4"
+    format: str = "mp3"
+
 
 def cleanup_file(path: str):
     """Elimina el archivo tras enviarlo para no saturar el disco."""
     if os.path.exists(path):
         os.remove(path)
+
 
 @app.post("/download")
 def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
@@ -97,15 +99,15 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
     except RuntimeError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
-    # Usar clientes móviles que no exigen las mismas restricciones de firma    
+    # Usar el cliente 'web' para que yt-dlp lea y envíe las cookies
     common_extractor_args = {
         "youtube": {
-            "player_client": ["ios", "android"]
+            "player_client": ["web"]
         }
     }
 
     cookie_path = get_writable_cookies()
-
+    print(f"Usando archivo de cookies en: {cookie_path}")
 
     if req.format == "mp3":
         ydl_opts = {
@@ -129,7 +131,6 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
             "quiet": False,
         }
 
-    
     if cookie_path:
         ydl_opts["cookiefile"] = cookie_path
 
@@ -139,14 +140,12 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
             video_id = info.get("id")
             title = info.get("title", "audio")
 
-        # Localizar el archivo resultante generado
         expected_ext = "mp3" if req.format == "mp3" else "mp4"
         file_path = os.path.join(DOWNLOAD_DIR, f"{video_id}.{expected_ext}")
 
         if not os.path.exists(file_path):
             raise HTTPException(status_code=500, detail="Error al generar el archivo.")
 
-        # Limpiar nombre para la cabecera de descarga
         clean_title = "".join(c for c in title if c.isalnum() or c in (" ", "-", "_")).rstrip()
         filename = f"{clean_title}.{expected_ext}"
 
@@ -155,6 +154,7 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn
