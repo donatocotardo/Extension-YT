@@ -1,7 +1,9 @@
 import os
 import glob
 import shutil
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+import time
+import threading
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -20,29 +22,30 @@ app.add_middleware(
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-SECRET_COOKIES_PATH = "/etc/secrets/cookies.txt"
-WRITABLE_COOKIES_PATH = os.path.join(DOWNLOAD_DIR, "cookies_working.txt")
+TIMEOUT_SECONDS = 300 
+last_activity_time = time.time()
 
+@app.middleware("http")
+async def update_activity_timer(request: Request, call_next):
+    global last_activity_time
+    last_activity_time = time.time()
+    response = await call_next(request)
+    last_activity_time = time.time()  # Reiniciar también al terminar la descarga
+    return response
 
-def get_writable_cookies() -> str | None:
-    """Copia el archivo de cookies de solo lectura a una ruta escribible."""
-    if os.path.exists(SECRET_COOKIES_PATH):
-        shutil.copyfile(SECRET_COOKIES_PATH, WRITABLE_COOKIES_PATH)
-        return WRITABLE_COOKIES_PATH
-    if os.path.exists("cookies.txt"):
-        shutil.copyfile("cookies.txt", WRITABLE_COOKIES_PATH)
-        return WRITABLE_COOKIES_PATH
-    return None
+def inactivity_monitor():
+    while True:
+        time.sleep(10)
+        if time.time() - last_activity_time > TIMEOUT_SECONDS:
+            os._exit(0)  # Cierra el servidor limpiamente tras 5 min inactivo
 
+threading.Thread(target=inactivity_monitor, daemon=True).start()
+
+@app.get("/ping")
+def ping():
+    return {"status": "awake"}
 
 def get_ffmpeg_location() -> str:
-    """Return the directory containing ffmpeg and ffprobe."""
-    configured_location = os.environ.get("FFMPEG_LOCATION")
-    if configured_location:
-        candidate_locations = [os.path.abspath(configured_location)]
-    else:
-        candidate_locations = []
-
     ffmpeg_path = shutil.which("ffmpeg")
     ffprobe_path = shutil.which("ffprobe")
     if ffmpeg_path and ffprobe_path:
@@ -52,41 +55,20 @@ def get_ffmpeg_location() -> str:
         winget_packages = os.path.join(
             os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Packages"
         )
-        candidate_locations.extend(
-            os.path.join(package, "bin")
-            for package in glob.glob(
-                os.path.join(winget_packages, "Gyan.FFmpeg_*", "*")
-            )
-        )
+        for package in glob.glob(os.path.join(winget_packages, "Gyan.FFmpeg_*", "*")):
+            bin_dir = os.path.join(package, "bin")
+            if os.path.isfile(os.path.join(bin_dir, "ffmpeg.exe")):
+                return bin_dir
 
-    ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
-    ffprobe_name = "ffprobe.exe" if os.name == "nt" else "ffprobe"
-    for location in candidate_locations:
-        if os.path.isfile(os.path.join(location, ffmpeg_name)) and os.path.isfile(
-            os.path.join(location, ffprobe_name)
-        ):
-            return location
-
-    if configured_location:
-        raise RuntimeError(
-            f"FFMPEG_LOCATION no contiene ffmpeg y ffprobe: {configured_location}"
-        )
-    raise RuntimeError(
-        "No se encontraron ffmpeg y ffprobe. Instala FFmpeg y agrega su carpeta "
-        "bin al PATH, o define FFMPEG_LOCATION con esa carpeta."
-    )
-
+    raise RuntimeError("No se encontró FFmpeg.")
 
 class DownloadRequest(BaseModel):
     url: str
     format: str = "mp3"
 
-
 def cleanup_file(path: str):
-    """Elimina el archivo tras enviarlo para no saturar el disco."""
     if os.path.exists(path):
         os.remove(path)
-
 
 @app.post("/download")
 def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
@@ -99,15 +81,11 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
     except RuntimeError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
-    # Usar el cliente 'web' para que yt-dlp lea y envíe las cookies
     common_extractor_args = {
         "youtube": {
-            "player_client": ["web"]
+            "player_client": ["android", "web"]
         }
     }
-
-    cookie_path = get_writable_cookies()
-    print(f"Usando archivo de cookies en: {cookie_path}")
 
     if req.format == "mp3":
         ydl_opts = {
@@ -115,13 +93,12 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
             "outtmpl": out_template,
             "ffmpeg_location": ffmpeg_location,
             "extractor_args": common_extractor_args,
-            "js_runtimes": {"node": {}}, 
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-            "quiet": False,
+            "quiet": True,
         }
     else:
         ydl_opts = {
@@ -129,12 +106,8 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
             "outtmpl": out_template,
             "ffmpeg_location": ffmpeg_location,
             "extractor_args": common_extractor_args,
-            "js_runtimes": {"node": {}},
-            "quiet": False,
+            "quiet": True,
         }
-
-    if cookie_path:
-        ydl_opts["cookiefile"] = cookie_path
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -157,7 +130,6 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

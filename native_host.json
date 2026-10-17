@@ -1,0 +1,9 @@
+{
+  "name": "com.ytdownloader.starter",
+  "description": "Despertador del servidor local YT",
+  "path": "launcher.bat",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://aijfdinpkpchhcbjhildmggbnmknljdf/"
+  ]
+}
