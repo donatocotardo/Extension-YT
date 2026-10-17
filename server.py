@@ -1,9 +1,7 @@
 import os
 import glob
 import shutil
-import time
-import threading
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -21,25 +19,6 @@ app.add_middleware(
 
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-
-TIMEOUT_SECONDS = 300 
-last_activity_time = time.time()
-
-@app.middleware("http")
-async def update_activity_timer(request: Request, call_next):
-    global last_activity_time
-    last_activity_time = time.time()
-    response = await call_next(request)
-    last_activity_time = time.time()  # Reiniciar también al terminar la descarga
-    return response
-
-def inactivity_monitor():
-    while True:
-        time.sleep(10)
-        if time.time() - last_activity_time > TIMEOUT_SECONDS:
-            os._exit(0)  # Cierra el servidor limpiamente tras 5 min inactivo
-
-threading.Thread(target=inactivity_monitor, daemon=True).start()
 
 @app.get("/ping")
 def ping():
