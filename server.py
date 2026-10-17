@@ -84,10 +84,10 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
     except RuntimeError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
-    # Forzar el cliente de Android/mweb para evitar el bloqueo SABR
+    # Usar clientes móviles que no exigen las mismas restricciones de firma    
     common_extractor_args = {
         "youtube": {
-            "player_client": ["android", "web"]
+            "player_client": ["ios", "android"]
         }
     }
 
