@@ -3,47 +3,146 @@
 <head>
   <meta charset="UTF-8">
   <style>
+    :root {
+      color-scheme: dark;
+      --background: #090909;
+      --surface: #181818;
+      --surface-hover: #242424;
+      --text: #f5f5f5;
+      --muted: #a7a7a7;
+      --accent: #1ed760;
+      --accent-hover: #35e878;
+    }
+
     body {
-      width: 240px;
-      padding: 14px;
-      font-family: system-ui, sans-serif;
-      margin: 0;
+      width: 280px;
+      padding: 20px;
       box-sizing: border-box;
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
     }
-    h4 {
-      margin: 0 0 10px 0;
-      font-size: 14px;
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
     }
+
+    .brand-mark {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #071108;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .brand-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand-name {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-subtitle {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .card {
+      padding: 16px;
+      border: 1px solid #292929;
+      border-radius: 12px;
+      background: var(--surface);
+    }
+
+    .card-title {
+      margin: 0 0 4px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .card-description {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
     button {
       width: 100%;
-      padding: 8px;
-      margin-bottom: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background: #f0f0f0;
+      padding: 11px 14px;
+      margin-top: 8px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #071108;
       cursor: pointer;
-      font-weight: 500;
+      font-size: 13px;
+      font-weight: 700;
+      transition: background 120ms ease, transform 120ms ease;
     }
+
     button:hover {
-      background: #e4e4e4;
+      background: var(--accent-hover);
+      transform: translateY(-1px);
     }
+
     button:disabled {
       cursor: not-allowed;
       opacity: 0.6;
+      transform: none;
     }
+
+    button:focus-visible {
+      outline: 2px solid #ffffff;
+      outline-offset: 3px;
+    }
+
     #status {
-      font-size: 12px;
-      color: #666;
       min-height: 16px;
+      margin: 14px 2px 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
       word-break: break-word;
+    }
+
+    .footer {
+      margin: 16px 0 0;
+      color: #6f6f6f;
+      font-size: 10px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <h4>Descargar YouTube</h4>
-  <button id="btn-mp3">Descargar MP3</button>
-  <button id="btn-mp4">Descargar MP4</button>
-  <div id="status">Listo</div>
+  <header class="brand">
+    <div class="brand-mark" aria-hidden="true">↓</div>
+    <div class="brand-copy">
+      <div class="brand-name">Downloader YT</div>
+    </div>
+  </header>
+
+  <main class="card">
+    <h1 class="card-title">Descarga rápida</h1>
+    <p class="card-description">Elige el formato para guardar tu vídeo.</p>
+    <button id="btn-mp3">Descargar como MP3</button>
+    <button id="btn-mp4">Descargar como MP4</button>
+    <div id="status" role="status" aria-live="polite">Listo para descargar</div>
+  </main>
+
+  <p class="footer">Downloader YT · local y sencillo</p>
 
   <script src="popup.js"></script>
 </body>
