@@ -13,29 +13,39 @@ function setButtonsState(disabled) {
   btnMp4.disabled = disabled;
 }
 
-async function isServerAwake() {
-  try {
-    const res = await fetch(`${BASE_URL}/ping`);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 async function ensureServerRunning() {
-  if (await isServerAwake()) return true;
+  try {
+    if ((await fetch(`${BASE_URL}/ping`)).ok) return true;
+  } catch {}
 
   statusEl.textContent = "Iniciando servidor local...";
+  let startError;
   try {
-    chrome.runtime.sendNativeMessage("com.ytdownloader.starter", {});
-  } catch (e) {}
+    chrome.runtime.sendNativeMessage(
+      "com.ytdownloader.starter",
+      {},
+      () => {
+        if (chrome.runtime.lastError) {
+          startError = chrome.runtime.lastError.message;
+        }
+      },
+    );
+  } catch (error) {
+    startError = error.message;
+  }
 
-  // Esperar hasta 6 segundos a que el servidor responda
+  // Dar tiempo al host nativo para iniciar el servidor.
   for (let i = 0; i < 12; i++) {
     await new Promise((r) => setTimeout(r, 500));
-    if (await isServerAwake()) return true;
+    try {
+      if ((await fetch(`${BASE_URL}/ping`)).ok) return true;
+    } catch {}
   }
-  throw new Error("No se pudo iniciar el servidor local automáticamente.");
+
+  const detail = startError ? ` (${startError})` : "";
+  throw new Error(
+    `No se pudo iniciar el servidor local${detail}. Haz doble clic en launcher.bat y vuelve a intentarlo.`,
+  );
 }
 
 async function triggerDownload(format) {
