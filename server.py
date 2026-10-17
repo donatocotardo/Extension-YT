@@ -21,6 +21,19 @@ app.add_middleware(
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+SECRET_COOKIES_PATH = "/etc/secrets/cookies.txt"
+WRITABLE_COOKIES_PATH = os.path.join(DOWNLOAD_DIR, "cookies_working.txt")
+
+def get_writable_cookies() -> str | None:
+    """Copia el archivo de cookies de solo lectura a una ruta escribible."""
+    if os.path.exists(SECRET_COOKIES_PATH):
+        shutil.copyfile(SECRET_COOKIES_PATH, WRITABLE_COOKIES_PATH)
+        return WRITABLE_COOKIES_PATH
+    # Si estás en local y tienes un cookies.txt en la misma carpeta:
+    if os.path.exists("cookies.txt"):
+        shutil.copyfile("cookies.txt", WRITABLE_COOKIES_PATH)
+        return WRITABLE_COOKIES_PATH
+    return None
 
 def get_ffmpeg_location() -> str:
     """Return the directory containing ffmpeg and ffprobe."""
@@ -91,13 +104,15 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
         }
     }
 
+    cookie_path = get_writable_cookies()
+
+
     if req.format == "mp3":
         ydl_opts = {
             "format": "bestaudio/best",
             "outtmpl": out_template,
             "ffmpeg_location": ffmpeg_location,
             "extractor_args": common_extractor_args,
-            "cookiefile": "/etc/secrets/cookies.txt",
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
@@ -111,9 +126,12 @@ def download_media(req: DownloadRequest, background_tasks: BackgroundTasks):
             "outtmpl": out_template,
             "ffmpeg_location": ffmpeg_location,
             "extractor_args": common_extractor_args,
-            "cookiefile": "/etc/secrets/cookies.txt",
             "quiet": False,
         }
+
+    
+    if cookie_path:
+        ydl_opts["cookiefile"] = cookie_path
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
